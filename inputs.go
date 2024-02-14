@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/cursor"
@@ -21,7 +22,7 @@ var (
 	inputsHelpStyle     = blurredStyle.Copy()
 	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
-	focusedButton = focusedStyle.Copy().Render("[ Submit ]")
+	focusedButton = focusedStyle.Copy().Render("[ Change ]")
 	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
 )
 
@@ -51,7 +52,7 @@ func inputsInitialModel() inputs {
 		case 1:
 			t.Placeholder = "Short break Time:"
 		case 2:
-			t.Placeholder = "Long break Time"
+			t.Placeholder = "Long break Time:"
 		}
 
 		m.inputs[i] = t
@@ -69,20 +70,7 @@ func (m inputs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
-			return m, tea.Quit
-
-		// Change cursor mode
-		case "ctrl+r":
-			m.cursorMode++
-			if m.cursorMode > cursor.CursorHide {
-				m.cursorMode = cursor.CursorBlink
-			}
-			cmds := make([]tea.Cmd, len(m.inputs))
-			for i := range m.inputs {
-				cmds[i] = m.inputs[i].Cursor.SetMode(m.cursorMode)
-			}
-			return m, tea.Batch(cmds...)
-
+			return timerModel.Update(initialModel(workTime, shortBreak, longBreak), m)
 		// Set focus to next input
 		case "tab", "shift+tab", "enter", "up", "down":
 			s := msg.String()
@@ -90,7 +78,10 @@ func (m inputs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Did the user press enter while the submit button was focused?
 			// If so, exit.
 			if s == "enter" && m.focusIndex == len(m.inputs) {
-				return model.Update(m)
+				w, _ := strconv.Atoi(m.inputs[0].Value())
+				short, _ := strconv.Atoi(m.inputs[1].Value())
+				long, _ := strconv.Atoi(m.inputs[2].Value())
+				return timerModel.Update(initialModel(w, short, long), s)
 			}
 
 			// Cycle indexes
@@ -159,9 +150,7 @@ func (m inputs) View() string {
 	}
 	fmt.Fprintf(&b, "\n\n%s\n\n", *button)
 
-	b.WriteString(inputsHelpStyle.Render("cursor mode is "))
-	b.WriteString(cursorModeHelpStyle.Render(m.cursorMode.String()))
-	b.WriteString(inputsHelpStyle.Render(" (ctrl+r to change style)"))
+	b.WriteString(inputsHelpStyle.Render(" (ctrl+c/esc to back)"))
 
-	return b.String()
+	return wrapperStyle.Align(lipgloss.Left).Render(b.String())
 }

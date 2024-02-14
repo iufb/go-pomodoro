@@ -22,6 +22,12 @@ const (
 	long
 )
 
+const (
+	workTime   int = 25
+	longBreak  int = 15
+	shortBreak int = 5
+)
+
 type keymap struct {
 	start  key.Binding
 	stop   key.Binding
@@ -30,7 +36,7 @@ type keymap struct {
 	quit   key.Binding
 }
 
-type model struct {
+type timerModel struct {
 	status       status
 	timer        timer.Model
 	workTime     int
@@ -42,7 +48,7 @@ type model struct {
 	quitting     bool
 }
 
-func (m model) GetStatus() string {
+func (m timerModel) GetStatus() string {
 	var s string
 	switch m.status {
 	case 0:
@@ -58,24 +64,28 @@ func (m model) GetStatus() string {
 	return s + "\n"
 }
 
-func (m model) getStyle(s string) string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("#c2a8c2")).Padding(1, 2).Border(lipgloss.RoundedBorder()).Render(s)
+var wrapperStyle = lipgloss.NewStyle().Align(lipgloss.Center).Border(lipgloss.RoundedBorder()).Padding(4, 4)
+
+func (m timerModel) getStyle(s string) string {
+	timerWrapper := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(3, 1).Bold(true).Foreground(lipgloss.Color("#fff")).Background(lipgloss.Color("#74E291")).Align(lipgloss.Center)
+	x, y := timerWrapper.GetFrameSize()
+	return timerWrapper.Width(20 + x).Height(20 - y).Render(s)
 }
 
-func (m model) Notify() {
+func (m timerModel) Notify() {
 	notify := exec.Command("notify-send", m.GetStatus())
-	sound := exec.Command("paplay", "./sound.wav")
+	sound := exec.Command("paplay", "./getup.mp3")
 	notify.Start()
 	sound.Start()
 }
 
-func initialModel() model {
-	return model{
+func initialModel(w, s, l int) timerModel {
+	return timerModel{
 		status:     start,
-		timer:      timer.NewWithInterval(time.Minute*25, time.Second),
-		workTime:   25,
-		shortBreak: 5,
-		longBreak:  15,
+		timer:      timer.NewWithInterval(time.Minute*time.Duration(w), time.Second),
+		workTime:   w,
+		shortBreak: s,
+		longBreak:  l,
 		keymap: keymap{
 			start: key.NewBinding(
 				key.WithKeys("s"),
@@ -83,7 +93,7 @@ func initialModel() model {
 			),
 			stop: key.NewBinding(
 				key.WithKeys("p"),
-				key.WithHelp("p", "stop"),
+				key.WithHelp("p", "stop "),
 			),
 			reset: key.NewBinding(
 				key.WithKeys("r"),
@@ -102,12 +112,12 @@ func initialModel() model {
 	}
 }
 
-func (m model) Init() tea.Cmd {
+func (m timerModel) Init() tea.Cmd {
 	// Just return `nil`, which means "no I/O right now, please."
-	return tea.SetWindowTitle("Pomodoro CLI App.")
+	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m timerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case timer.TickMsg:
@@ -142,6 +152,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Notify()
 		return m, cmd
 	case inputs:
+		m.keymap.stop.SetEnabled(false)
+		return m, nil
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keymap.quit):
@@ -149,19 +161,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case key.Matches(msg, m.keymap.reset):
 			m.timer.Timeout = time.Minute * time.Duration(m.workTime)
+			m.timer.Stop()
+
 		case key.Matches(msg, m.keymap.change):
-			return inputsInitialModel(), nil
+			return inputs(inputsInitialModel()), nil
 		case key.Matches(msg, m.keymap.start):
-			m.timer.Init()
 			m.status = work
-			m.Notify()
 			return m, m.timer.Start()
 		case key.Matches(msg, m.keymap.stop):
 			return m, m.timer.Stop()
 		}
 
 	}
-
 	// Return the updated model to the Bubble Tea runtime for processing.
 	// Note that we're not returning a command.
 	return m, nil
@@ -169,7 +180,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render
 
-func (m model) helpView() string {
+func (m timerModel) helpView() string {
 	return helpStyle("\n" + m.help.ShortHelpView([]key.Binding{
 		m.keymap.start,
 		m.keymap.stop,
@@ -179,23 +190,18 @@ func (m model) helpView() string {
 	}))
 }
 
-func (m model) View() string {
+func (m timerModel) View() string {
 	s := m.timer.View()
-	if m.timer.Timedout() {
-		s = "All done!"
-	}
 	s += "\n"
-	if !m.quitting {
-		s = m.GetStatus() + "Time:" + s
-		s += m.helpView()
-	}
-	return m.getStyle(s)
+	s = m.getStyle(m.GetStatus() + "Time:" + s)
+	w, h := wrapperStyle.GetFrameSize()
+	return wrapperStyle.Width(50 + w).Height(10 - h).Render(lipgloss.JoinVertical(lipgloss.Center, "Pomodoro CLI App", s, m.helpView()))
 }
 
 func main() {
-	m := initialModel()
+	m := initialModel(workTime, shortBreak, longBreak)
 	m.keymap.stop.SetEnabled(false)
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
