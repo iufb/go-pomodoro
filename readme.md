@@ -4,7 +4,7 @@
 
 ## Functionality:
 
-1.Start/stop timer.
-2.Reset timer.
-3.Change base time for work/short,long breaks.
-That's it.
+1. Start/stop timer.
+2. Reset timer.
+3. Change base time for work/short,long breaks.
+   That's it.
