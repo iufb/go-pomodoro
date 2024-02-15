@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	focusedStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	focusedStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#74E291"))
 	blurredStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	cursorStyle         = focusedStyle.Copy()
 	noStyle             = lipgloss.NewStyle()
@@ -23,7 +23,7 @@ var (
 	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 
 	focusedButton = focusedStyle.Copy().Render("[ Change ]")
-	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
+	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Change"))
 )
 
 type inputs struct {
@@ -81,7 +81,7 @@ func (m inputs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				w, _ := strconv.Atoi(m.inputs[0].Value())
 				short, _ := strconv.Atoi(m.inputs[1].Value())
 				long, _ := strconv.Atoi(m.inputs[2].Value())
-				return timerModel.Update(initialModel(w, short, long), s)
+				return timerModel.Update(initialModel(w, short, long), m)
 			}
 
 			// Cycle indexes
